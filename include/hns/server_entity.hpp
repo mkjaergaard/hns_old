@@ -75,12 +75,12 @@ public:
 
   IDListType& accessPseudoTagList()
   {
-    return tag_list_;
+    return pseudo_tag_list_;
   }
 
   const IDListType& accessPseudoTagList() const
   {
-    return tag_list_;
+    return pseudo_tag_list_;
   }
 
   const std::string& getName() const
@@ -256,8 +256,11 @@ public:
 
   void populateGroupFindLocalPseudoTags(const std::string& target_tag_name,
 					const boost::shared_ptr<Namespace> target_ns,
-					std::set<boost::uuids::uuid>& group)
+					std::set<boost::uuids::uuid>& group,
+					std::set<boost::uuids::uuid>& visited_ns_list)
   {
+//    std::cout << "populateGroupFindLocalPseudoTags " << target_tag_name << std::endl;
+
     for(IDListType::const_iterator it = target_ns->accessPseudoTagList().begin();
 	it != target_ns->accessPseudoTagList().end();
 	it++)
@@ -265,21 +268,34 @@ public:
       boost::shared_ptr<PseudoTag> pseudo_tag = findPseudoTag(*it);
       if (pseudo_tag->getTargetName() == target_tag_name)
       {
-	populateGroupFromTagName(pseudo_tag->getName(), target_ns, group);
+	if(visited_ns_list.find(*it) == visited_ns_list.end())
+	{
+	  visited_ns_list.insert(*it);
+
+	  populateGroupFromTagName(pseudo_tag->getName(), target_ns, group, visited_ns_list);
+	}
       }
       else if(pseudo_tag->getName() == target_tag_name)
       {
-	populateGroupFromTagName(pseudo_tag->getTargetName(),
-				 findNamespace(pseudo_tag->getTargetNamespace()),
-				 group);
+	if(visited_ns_list.find(*it) == visited_ns_list.end())
+	{
+	  visited_ns_list.insert(*it);
+	  populateGroupFromTagName(pseudo_tag->getTargetName(),
+				   findNamespace(pseudo_tag->getTargetNamespace()),
+				   group,
+				   visited_ns_list);
+	}
       }
     }
   }
 
   void populateGroupFindParentPseudoTags(const std::string& target_tag_name,
 					 const boost::shared_ptr<Namespace> target_ns,
-					 std::set<boost::uuids::uuid>& group)
+					 std::set<boost::uuids::uuid>& group,
+					 std::set<boost::uuids::uuid>& visited_ns_list)
   {
+//    std::cout << "populateGroupFindParentPseudoTags " << target_tag_name << std::endl;
+
     // 3 - search for remappings in parent namespace.
     if(target_ns->getParentNamespace() == nil_)
     {
@@ -297,7 +313,13 @@ public:
 	   pseudo_tag->getTargetName() == target_tag_name)
 	{
 	  // match!
-	  populateGroupFromTagName(pseudo_tag->getName(), parent_ns, group);
+//	    std::cout << "PSeudo Match.." << target_tag_name << std::endl;
+	  if(visited_ns_list.find(*it) == visited_ns_list.end())
+	  {
+	    visited_ns_list.insert(*it);
+
+	    populateGroupFromTagName(pseudo_tag->getName(), parent_ns, group, visited_ns_list);
+	  }
 	}
       }
     }
@@ -306,18 +328,23 @@ public:
 // based on tag
   void populateGroupFromTagName(const std::string& tag_name,
 				const boost::shared_ptr<Namespace> ns,
-				std::set<boost::uuids::uuid>& group)
+				std::set<boost::uuids::uuid>& group,
+				std::set<boost::uuids::uuid>& visited_ns_list)
   {
+//    std::cout << "populateGroupFromTagName " << tag_name << std::endl;
+
     // 2 - search for tags with same name
     for(IDListType::const_iterator it = ns->accessTagList().begin();
 	it != ns->accessTagList().end();
 	it++)
     {
       boost::shared_ptr<Tag> child_tag = findTag(*it);
+//      std::cout << "testing tag " << child_tag->getName() << std::endl;
       if(child_tag->getName() == tag_name)
       {
 	if(group.find(*it) == group.end())
 	{
+//	  std::cout << "Insert" << std::endl;
 	  group.insert(*it);
 	}
 	else
@@ -326,27 +353,20 @@ public:
 	}
       }
     }
-    populateGroupFindLocalPseudoTags(tag_name, ns, group);
-    populateGroupFindParentPseudoTags(tag_name, ns, group);
+    populateGroupFindLocalPseudoTags(tag_name, ns, group, visited_ns_list);
+    populateGroupFindParentPseudoTags(tag_name, ns, group, visited_ns_list);
   }
 
   void populateGroupFromTag(const boost::uuids::uuid& tag_id,
 			    std::set<boost::uuids::uuid>& group)
   {
+    std::set<boost::uuids::uuid> visited_ns_list;
     boost::shared_ptr<Tag> tag = findTag(tag_id);
     populateGroupFromTagName(tag->getName(),
 			     findNamespace(tag->getNamespace()),
-			     group);
+			     group,
+			     visited_ns_list);
   }
-
-  void populateGroup(boost::uuids::uuid tag_i, std::set<boost::uuids::uuid> group)
-  {
-    group.clear();
-    // 1 - find all tags with same name
-    // 2 - find all pseudo-tags in parent namespace
-    // 3 - recurse
-  }
-
 
   // not thread safe, only call from Server thread
   const boost::uuids::uuid& hasChildNamespace(const boost::shared_ptr<const Namespace>& ns, const std::string& child_name)
@@ -550,8 +570,8 @@ public:
     item++;
     if(item != tokenizer2.end())
     {
-      target_ns_id = registerNamespace(current_ns_id, target_tag);
-      std::string target_tag_name = *item;
+      target_ns_id = registerNamespace(current_ns_id, target_tag_name);
+      target_tag_name = *item;
     }
 
     return registerPseudoTag(current_ns_id, *last, target_ns_id, target_tag_name);
