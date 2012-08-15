@@ -1,9 +1,9 @@
-Catkin-ProjectName: hns
+Catkin-ProjectName: llog
 Description:
 Author: Morten Kjaergaard <mkjargaard@willowgarage.com>
 Maintainer: Morten Kjaergaard <mkjargaard@willowgarage.com>
 Homepage:
-Vcs-Git: git://github.com/mkjargaard/hns.git
+Vcs-Git: git://github.com/mkjargaard/llog.git
 
 Version: 0.0.1
 
